@@ -1,0 +1,14 @@
+alpine-version: "3.23.3"
+headless: false
+
+vm:
+  cpus: 4
+  memory: 4096
+  mac: "52:54:00:ab:cd:01"
+  disk-size-gb: 20
+
+provision:
+  - apk update
+  - apk add curl bash
+  - apk add libgcc libstdc++ ripgrep
+  - curl -fsSL https://claude.ai/install.sh | bash

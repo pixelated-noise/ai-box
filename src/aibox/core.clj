@@ -1,12 +1,15 @@
 (ns aibox.core
   (:require [babashka.fs :as fs]
             [babashka.process :as p]
+            [clj-yaml.core :as yaml]
             [clojure.string :as str]))
 
 (def config
-  (let [alpine-version "3.23.3"
+  (let [user-config    (yaml/parse-string (slurp "config.yaml"))
+        alpine-version (:alpine-version user-config)
         iso-filename   (str "alpine-standard-" alpine-version "-aarch64.iso")
-        data-dir       "data"]
+        data-dir       "data"
+        vm             (:vm user-config)]
     {:alpine-version alpine-version
      :iso-filename   iso-filename
      :iso-url        (str "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/aarch64/" iso-filename)
@@ -14,9 +17,11 @@
      :iso-path       (str data-dir "/" iso-filename)
      :ssh-key-path   (str data-dir "/id_ed25519")
      :efi-vars-path  (str data-dir "/efi-vars")
-     :mac            "52:54:00:ab:cd:01"
-     :cpus           4
-     :memory         4096}))
+     :headless       (:headless user-config false)
+     :provision      (:provision user-config [])
+     :mac            (:mac vm "52:54:00:ab:cd:01")
+     :cpus           (:cpus vm 4)
+     :memory         (:memory vm 4096)}))
 
 (defn download []
   (let [{:keys [data-dir iso-path iso-url]} config]
@@ -37,7 +42,7 @@
     ssh-key-path))
 
 (defn- create-overlay []
-  (let [{:keys [data-dir]} config
+  (let [{:keys [data-dir provision]} config
         work-dir    (str data-dir "/.overlay-work")
         apkovl-root (str work-dir "/apkovl")
         tar-dir     (str work-dir "/tar")
@@ -47,15 +52,26 @@
         vol-name    "APKOVL"
         key-path    (generate-ssh-key)
         pub-key     (str/trim (slurp (str key-path ".pub")))
-        user-script (when (fs/exists? "provision/setup.sh")
-                      (slurp "provision/setup.sh"))
         script      (str "#!/bin/sh\n"
                          "set -e\n\n"
+                         "# Log to serial console\n"
+                         "exec > /dev/hvc0 2>&1\n"
+                         "echo '=== aibox provisioning started ==='\n\n"
                          "# Load kernel modules and networking\n"
                          "rc-service modloop start\n"
                          "ip link set eth0 up\n"
                          "udhcpc -i eth0\n"
                          "sleep 2\n\n"
+                         "# Enable online repositories\n"
+                         "cat > /etc/apk/repositories << 'REPOEOF'\n"
+                         "https://dl-cdn.alpinelinux.org/alpine/v"
+                         (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
+                         "/main\n"
+                         "https://dl-cdn.alpinelinux.org/alpine/v"
+                         (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
+                         "/community\n"
+                         "REPOEOF\n"
+                         "apk update\n\n"
                          "# SSH\n"
                          "apk add openssh\n"
                          "mkdir -p /root/.ssh\n"
@@ -66,8 +82,10 @@
                          "chmod 600 /root/.ssh/authorized_keys\n"
                          "rc-update add sshd default\n"
                          "/etc/init.d/sshd start\n"
-                         (when user-script
-                           (str "\n# User provisioning\n" user-script "\n")))]
+                         (when (seq provision)
+                           (str "\n# User provisioning\n"
+                                (str/join "\n" provision) "\n"))
+                         "\necho '=== aibox provisioning complete ==='\n")]
 
     ;; Clean previous work
     (fs/delete-tree work-dir)
@@ -109,22 +127,25 @@
     img-path))
 
 (defn boot []
-  (let [{:keys [cpus memory efi-vars-path iso-path mac]} config
+  (let [{:keys [cpus memory efi-vars-path iso-path mac headless]} config
         create-efi?  (not (fs/exists? efi-vars-path))
-        overlay-path (create-overlay)]
-    (println "Booting Alpine Linux...")
-    (p/shell "vfkit"
-             "--cpus" (str cpus)
-             "--memory" (str memory)
-             "--bootloader" (str "efi,variable-store=" efi-vars-path
-                                 (when create-efi? ",create"))
-             "--device" (str "usb-mass-storage,path=" iso-path ",readonly")
-             "--device" (str "usb-mass-storage,path=" overlay-path ",readonly")
-             "--device" (str "virtio-net,nat,mac=" mac)
-             "--device" "virtio-input,keyboard"
-             "--device" "virtio-input,pointing"
-             "--device" "virtio-gpu,width=1024,height=768"
-             "--gui")))
+        overlay-path (create-overlay)
+        base-args    ["vfkit"
+                      "--cpus" (str cpus)
+                      "--memory" (str memory)
+                      "--bootloader" (str "efi,variable-store=" efi-vars-path
+                                          (when create-efi? ",create"))
+                      "--device" (str "usb-mass-storage,path=" iso-path ",readonly")
+                      "--device" (str "usb-mass-storage,path=" overlay-path ",readonly")
+                      "--device" (str "virtio-net,nat,mac=" mac)
+                      "--device" "virtio-serial,stdio"]
+        gui-args     ["--device" "virtio-input,keyboard"
+                      "--device" "virtio-input,pointing"
+                      "--device" "virtio-gpu,width=1024,height=768"
+                      "--gui"]
+        args         (if headless base-args (into base-args gui-args))]
+    (println "Booting Alpine Linux" (if headless "(headless)" "(GUI)") "...")
+    (apply p/shell args)))
 
 (defn- parse-dhcp-leases []
   (let [content (slurp "/var/db/dhcpd_leases")]
@@ -151,12 +172,13 @@
   (let [{:keys [ssh-key-path]} config]
     (if-let [ip (vm-ip)]
       (do
-        (println "Connecting to" ip "...")
-        (p/shell "ssh"
-                 "-i" ssh-key-path
-                 "-o" "StrictHostKeyChecking=no"
-                 "-o" "UserKnownHostsFile=/dev/null"
-                 (str "root@" ip)))
+        (let [cmd ["ssh"
+                   "-i" ssh-key-path
+                   "-o" "StrictHostKeyChecking=no"
+                   "-o" "UserKnownHostsFile=/dev/null"
+                   (str "root@" ip)]]
+          (println (str/join " " cmd))
+          (apply p/shell cmd)))
       (do
         (println "No VM found in DHCP leases. Is the VM running?")
         (System/exit 1)))))
