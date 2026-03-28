@@ -1,0 +1,21 @@
+{:paths ["src"]
+
+ :tasks
+ {:requires ([aibox.core :as ai])
+
+  download
+  {:doc  "Download the Alpine Linux aarch64 ISO"
+   :task (ai/download)}
+
+  boot
+  {:doc     "Boot Alpine Linux live from ISO"
+   :depends [download]
+   :task    (ai/boot)}
+
+  ssh
+  {:doc  "SSH into the running VM"
+   :task (ai/ssh)}
+
+  clean
+  {:doc  "Remove all downloaded and generated files"
+   :task (ai/clean)}}}
