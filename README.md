@@ -100,8 +100,7 @@ provision:
   - apk update
   - apk add curl bash
   - apk add libgcc libstdc++ ripgrep
-  - apk add nodejs npm
-  - npm install -g @anthropic-ai/claude-code
+  - curl -fsSL https://claude.ai/install.sh | bash
 ```
 
 ### Options
