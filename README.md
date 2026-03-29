@@ -51,7 +51,8 @@ Wait for `=== aibox provisioning complete ===` in the boot terminal before runni
 | `bb allow` | Remove VM network restrictions (requires sudo) |
 | `bb login` | Generate/refresh the OAuth token without booting |
 | `bb download` | Download the Alpine ISO only |
-| `bb clean` | Remove generated files (keeps the ISO) |
+| `bb clean` | Remove generated files (keeps the ISO and OAuth token) |
+| `bb clean --logout` | Remove generated files including the OAuth token |
 
 ## Network restriction
 
@@ -71,7 +72,7 @@ This restriction is enforced on the host, so even if Claude Code runs with full 
 
 ai-box uses Claude Code's `setup-token` command to generate a long-lived OAuth token (valid for 1 year) that gets injected into the VM as `CLAUDE_CODE_OAUTH_TOKEN`. This uses your existing Claude subscription -- no separate API billing.
 
-On first `bb boot` (or `bb login`), you'll be prompted to authenticate via your browser. The token is cached in `data/oauth-token` and reused on subsequent boots. Run `bb clean` to force re-authentication.
+On first `bb boot` (or `bb login`), you'll be prompted to authenticate via your browser. The token is cached in `data/oauth-token` and reused on subsequent boots. Run `bb clean --logout` to force re-authentication.
 
 The host's `~/.claude` directory is mounted read-only inside the VM for configuration, and `~/.claude.json` is copied into the overlay.
 
@@ -118,7 +119,7 @@ provision:
 - **No persistence** -- the VM is ephemeral. Any work done inside it is lost when vfkit stops, unless it's on a read-write mount. Clone repos into a mounted directory and push results before shutting down.
 - **Read-write mounts** -- directories mounted with `readonly: false` can be modified by processes in the VM. Use read-only mounts for anything you don't want changed.
 - **Network access** -- the VM has full outbound internet access by default. Use `bb block` to restrict it to Anthropic API only before running Claude Code in autonomous mode.
-- **OAuth token** -- the long-lived OAuth token is stored in `data/oauth-token` and injected into the VM. Keep this file secure. Run `bb clean` to remove it.
+- **OAuth token** -- the long-lived OAuth token is stored in `data/oauth-token` and injected into the VM. Keep this file secure. `bb clean` preserves it; use `bb clean --logout` to remove it.
 - **Not a security boundary** -- vfkit uses Apple's Virtualization.framework, which provides reasonable isolation but is not designed as a security sandbox. Don't rely on this for running untrusted adversarial code.
 - **Provisioning runs every boot** -- since nothing persists, packages are re-downloaded each time. Boot-to-ready takes a minute or two depending on your connection.
 
