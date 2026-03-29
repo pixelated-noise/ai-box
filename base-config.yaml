@@ -13,6 +13,6 @@ mounts:
 
 provision:
   - apk update
-  - apk add curl bash screen
+  - apk add curl bash screen git
   - apk add libgcc libstdc++ ripgrep
   - su - {{username}} -c "curl -fsSL https://claude.ai/install.sh | bash"
