@@ -12,6 +12,10 @@
    :depends [download]
    :task    (ai/boot)}
 
+  login
+  {:doc  "Generate a long-lived OAuth token for Claude Code"
+   :task (ai/login)}
+
   ssh
   {:doc  "SSH into the running VM"
    :task (ai/ssh)}

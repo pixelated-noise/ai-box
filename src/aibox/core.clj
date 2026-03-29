@@ -41,6 +41,33 @@
       (p/shell "ssh-keygen" "-t" "ed25519" "-f" ssh-key-path "-N" "" "-q"))
     ssh-key-path))
 
+(def token-path (str (:data-dir config) "/oauth-token"))
+
+(defn- ensure-oauth-token []
+  (if (fs/exists? token-path)
+    (str/trim (slurp token-path))
+    (do
+      (println "No OAuth token found. Running 'claude setup-token'...")
+      (let [output (:out (p/shell {:out :string}
+                                  "script" "-q" "/dev/null"
+                                  "claude" "setup-token"))
+            token  (->> (str/split-lines output)
+                        (keep #(re-find #"sk-ant-\S+" %))
+                        first)]
+        (if token
+          (do
+            (fs/create-dirs (:data-dir config))
+            (spit token-path token)
+            (println "OAuth token saved.")
+            token)
+          (do
+            (println "Failed to capture token from output:")
+            (println "---")
+            (println output)
+            (println "---")
+            (println "Run 'claude setup-token' manually and save the token to" token-path)
+            (System/exit 1)))))))
+
 (defn- create-overlay []
   (let [{:keys [data-dir provision]} config
         work-dir    (str data-dir "/.overlay-work")
@@ -52,6 +79,7 @@
         vol-name    "APKOVL"
         key-path    (generate-ssh-key)
         pub-key     (str/trim (slurp (str key-path ".pub")))
+        oauth-token (ensure-oauth-token)
         script      (str "#!/bin/sh\n"
                          "set -e\n\n"
                          "# Log to serial console\n"
@@ -73,6 +101,7 @@
                          "REPOEOF\n"
                          "apk update\n\n"
                          "# SSH\n"
+                         "echo 'root:aibox' | chpasswd\n"
                          "apk add openssh\n"
                          "mkdir -p /root/.ssh\n"
                          "chmod 700 /root/.ssh\n"
@@ -80,8 +109,15 @@
                          pub-key "\n"
                          "SSHEOF\n"
                          "chmod 600 /root/.ssh/authorized_keys\n"
+                         "sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config\n"
                          "rc-update add sshd default\n"
-                         "/etc/init.d/sshd start\n"
+                         "/etc/init.d/sshd start\n\n"
+                         "# Mount ~/.claude from host\n"
+                         "mkdir -p /root/.claude\n"
+                         "mount -t virtiofs -o ro claude-config /root/.claude\n\n"
+                         "# Add ~/.local/bin to PATH and Claude auth for all sessions\n"
+                         "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> /etc/profile\n"
+                         "echo 'export CLAUDE_CODE_OAUTH_TOKEN=\"" oauth-token "\"' >> /etc/profile\n"
                          (when (seq provision)
                            (str "\n# User provisioning\n"
                                 (str/join "\n" provision) "\n"))
@@ -101,6 +137,12 @@
     (spit (str apkovl-root "/etc/local.d/provision.start") script)
     (p/shell "chmod" "+x" (str apkovl-root "/etc/local.d/provision.start"))
 
+    ;; Include .claude.json in overlay
+    (let [claude-json (str (System/getProperty "user.home") "/.claude.json")]
+      (when (fs/exists? claude-json)
+        (fs/create-dirs (str apkovl-root "/root"))
+        (fs/copy claude-json (str apkovl-root "/root/.claude.json"))))
+
     ;; Create apkovl tar.gz
     (fs/create-dirs tar-dir)
     (let [tar-path (str (fs/absolutize tar-dir) "/aibox.apkovl.tar.gz")]
@@ -111,7 +153,8 @@
                "-volname" vol-name "-o" dmg-base)
       (p/shell "hdiutil" "attach" dmg-path)
       (p/shell "cp" tar-path (str "/Volumes/" vol-name "/"))
-      (p/shell "hdiutil" "detach" (str "/Volumes/" vol-name))
+      (Thread/sleep 1000)
+      (p/shell "hdiutil" "detach" (str "/Volumes/" vol-name) "-force")
 
       ;; Convert DMG to raw disk image
       (let [output (:out (p/shell {:out :string}
@@ -138,7 +181,8 @@
                       "--device" (str "usb-mass-storage,path=" iso-path ",readonly")
                       "--device" (str "usb-mass-storage,path=" overlay-path ",readonly")
                       "--device" (str "virtio-net,nat,mac=" mac)
-                      "--device" "virtio-serial,stdio"]
+                      "--device" "virtio-serial,stdio"
+                      "--device" (str "virtio-fs,sharedDir=" (System/getProperty "user.home") "/.claude,mountTag=claude-config")]
         gui-args     ["--device" "virtio-input,keyboard"
                       "--device" "virtio-input,pointing"
                       "--device" "virtio-gpu,width=1024,height=768"
@@ -182,6 +226,10 @@
       (do
         (println "No VM found in DHCP leases. Is the VM running?")
         (System/exit 1)))))
+
+(defn login []
+  (ensure-oauth-token)
+  (println "Token stored at" token-path))
 
 (defn clean []
   (let [{:keys [data-dir iso-path]} config]
