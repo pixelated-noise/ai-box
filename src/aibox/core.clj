@@ -19,9 +19,15 @@
      :efi-vars-path  (str data-dir "/efi-vars")
      :headless       (:headless user-config false)
      :provision      (:provision user-config [])
+     :mounts         (:mounts user-config [])
      :mac            (:mac vm "52:54:00:ab:cd:01")
      :cpus           (:cpus vm 4)
      :memory         (:memory vm 4096)}))
+
+(defn- expand-home [path]
+  (if (str/starts-with? path "~")
+    (str/replace-first path "~" (System/getProperty "user.home"))
+    path))
 
 (defn download []
   (let [{:keys [data-dir iso-path iso-url]} config]
@@ -112,9 +118,15 @@
                          "sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config\n"
                          "rc-update add sshd default\n"
                          "/etc/init.d/sshd start\n\n"
-                         "# Mount ~/.claude from host\n"
-                         "mkdir -p /root/.claude\n"
-                         "mount -t virtiofs -o ro claude-config /root/.claude\n\n"
+                         "# Mount shared directories from host\n"
+                         (->> (:mounts config)
+                              (map-indexed
+                               (fn [i m]
+                                 (str "mkdir -p " (:guest m) "\n"
+                                      "mount -t virtiofs"
+                                      (when (:readonly m) " -o ro")
+                                      " mount" i " " (:guest m) "\n")))
+                              (str/join))
                          "# Add ~/.local/bin to PATH and Claude auth for all sessions\n"
                          "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> /etc/profile\n"
                          "echo 'export CLAUDE_CODE_OAUTH_TOKEN=\"" oauth-token "\"' >> /etc/profile\n"
@@ -173,16 +185,23 @@
   (let [{:keys [cpus memory efi-vars-path iso-path mac headless]} config
         create-efi?  (not (fs/exists? efi-vars-path))
         overlay-path (create-overlay)
-        base-args    ["vfkit"
-                      "--cpus" (str cpus)
-                      "--memory" (str memory)
-                      "--bootloader" (str "efi,variable-store=" efi-vars-path
-                                          (when create-efi? ",create"))
-                      "--device" (str "usb-mass-storage,path=" iso-path ",readonly")
-                      "--device" (str "usb-mass-storage,path=" overlay-path ",readonly")
-                      "--device" (str "virtio-net,nat,mac=" mac)
-                      "--device" "virtio-serial,stdio"
-                      "--device" (str "virtio-fs,sharedDir=" (System/getProperty "user.home") "/.claude,mountTag=claude-config")]
+        mount-args   (->> (:mounts config)
+                          (map-indexed
+                           (fn [i m]
+                             ["--device" (str "virtio-fs,sharedDir=" (expand-home (:host m))
+                                              ",mountTag=mount" i)]))
+                          (apply concat)
+                          vec)
+        base-args    (into ["vfkit"
+                            "--cpus" (str cpus)
+                            "--memory" (str memory)
+                            "--bootloader" (str "efi,variable-store=" efi-vars-path
+                                                (when create-efi? ",create"))
+                            "--device" (str "usb-mass-storage,path=" iso-path ",readonly")
+                            "--device" (str "usb-mass-storage,path=" overlay-path ",readonly")
+                            "--device" (str "virtio-net,nat,mac=" mac)
+                            "--device" "virtio-serial,stdio"]
+                           mount-args)
         gui-args     ["--device" "virtio-input,keyboard"
                       "--device" "virtio-input,pointing"
                       "--device" "virtio-gpu,width=1024,height=768"

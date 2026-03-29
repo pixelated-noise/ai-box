@@ -5,7 +5,11 @@ vm:
   cpus: 4
   memory: 4096
   mac: "52:54:00:ab:cd:01"
-  disk-size-gb: 20
+
+mounts:
+  - host: ~/.claude
+    guest: /root/.claude
+    readonly: true
 
 provision:
   - apk update
