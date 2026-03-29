@@ -268,6 +268,7 @@
                    "-i" ssh-key-path
                    "-o" "StrictHostKeyChecking=no"
                    "-o" "UserKnownHostsFile=/dev/null"
+                   "-o" "LogLevel=ERROR"
                    (str (System/getProperty "user.name") "@" ip)]]
           (println (str/join " " cmd))
           (apply p/shell {:continue true} cmd)))
