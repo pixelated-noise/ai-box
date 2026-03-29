@@ -80,6 +80,7 @@
           (do
             (fs/create-dirs (:data-dir config))
             (spit token-path token)
+            (fs/set-posix-file-permissions token-path "rw-------")
             (println "OAuth token saved.")
             token)
           (do
@@ -162,6 +163,7 @@
 
     ;; Cleanup
     (fs/delete-tree work-dir)
+    (fs/set-posix-file-permissions img-path "rw-------")
     (println "Created overlay:" img-path)
     img-path))
 
