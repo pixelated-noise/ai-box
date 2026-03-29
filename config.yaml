@@ -1,5 +1,5 @@
 alpine-version: "3.23.3"
-headless: false
+headless: true
 
 vm:
   cpus: 4
