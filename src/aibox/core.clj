@@ -2,19 +2,31 @@
   (:require [babashka.fs :as fs]
             [babashka.process :as p]
             [clj-yaml.core :as yaml]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [selmer.parser :as selmer]))
 
 (defn- expand-home [path]
   (if (str/starts-with? path "~")
     (str/replace-first path "~" (System/getProperty "user.home"))
     path))
 
+(def template-vars
+  {:username (System/getProperty "user.name")
+   :home     (System/getProperty "user.home")})
+
 (def config
-  (let [user-config    (yaml/parse-string (slurp "config.yaml"))
-        alpine-version (:alpine-version user-config)
+  (let [base           (yaml/parse-string (slurp "base-config.yaml"))
+        user           (when (fs/exists? "config.yaml")
+                         (yaml/parse-string (slurp "config.yaml")))
+        merged         (cond-> base
+                         user (-> (merge (dissoc user :mounts :provision :vm))
+                                  (update :vm merge (:vm user))))
+        all-mounts     (into (vec (:mounts base)) (:mounts user))
+        all-provision  (into (vec (:provision base)) (:provision user))
+        alpine-version (:alpine-version merged)
         iso-filename   (str "alpine-standard-" alpine-version "-aarch64.iso")
         data-dir       "data"
-        vm             (:vm user-config)]
+        vm             (:vm merged)]
     {:alpine-version alpine-version
      :iso-filename   iso-filename
      :iso-url        (str "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/aarch64/" iso-filename)
@@ -22,13 +34,13 @@
      :iso-path       (str data-dir "/" iso-filename)
      :ssh-key-path   (str data-dir "/id_ed25519")
      :efi-vars-path  (str data-dir "/efi-vars")
-     :headless       (:headless user-config false)
-     :provision      (:provision user-config [])
+     :headless       (:headless merged false)
+     :provision      (mapv #(selmer/render % template-vars) all-provision)
      :mounts         (mapv (fn [m]
                             (let [host-abs (expand-home (:host m))]
                               (merge m {:host-abs host-abs
                                         :guest    (:guest m host-abs)})))
-                          (:mounts user-config []))
+                          all-mounts)
      :mac            (:mac vm "52:54:00:ab:cd:01")
      :cpus           (:cpus vm 4)
      :memory         (:memory vm 4096)}))
@@ -90,8 +102,7 @@
         key-path    (generate-ssh-key)
         pub-key     (str/trim (slurp (str key-path ".pub")))
         oauth-token (ensure-oauth-token)
-        username    (System/getProperty "user.name")
-        home        (System/getProperty "user.home")
+        {:keys [username home]} template-vars
         alpine-repo (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
         script      (str "#!/bin/sh\n"
                          "set -e\n\n"
@@ -113,8 +124,8 @@
                          "REPOEOF\n"
                          "apk update\n\n"
                          "# Create user\n"
-                         "apk add sudo shadow\n"
-                         "useradd -m -d " home " -s /bin/sh " username "\n"
+                         "apk add bash sudo shadow\n"
+                         "useradd -m -d " home " -s /bin/bash " username "\n"
                          "chown -R " username ":" username " " home "\n"
                          "echo '" username ":aibox' | chpasswd\n"
                          "echo '" username " ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/" username "\n\n"
@@ -259,7 +270,7 @@
                    "-o" "UserKnownHostsFile=/dev/null"
                    (str (System/getProperty "user.name") "@" ip)]]
           (println (str/join " " cmd))
-          (apply p/shell cmd)))
+          (apply p/shell {:continue true} cmd)))
       (do
         (println "No VM found in DHCP leases. Is the VM running?")
         (System/exit 1)))))
@@ -294,7 +305,7 @@
         (spit "/tmp/aibox-pf.rules" rules)
         (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-f" "/tmp/aibox-pf.rules")
         (p/shell {:continue true} "sudo" "pfctl" "-e")
-        (println "Network restricted to Anthropic API only on" bridge "for" ip))
+        (println "=== Network restricted to Anthropic API only on" bridge "for" ip " ==="))
       (do
         (println "Could not find bridge interface for VM.")
         (System/exit 1)))
@@ -304,7 +315,7 @@
 
 (defn open-network []
   (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-F" "rules")
-  (println "Network restrictions removed."))
+  (println "=== Network restrictions removed. ==="))
 
 (defn clean [{:keys [logout]}]
   (let [{:keys [data-dir iso-path]} config
