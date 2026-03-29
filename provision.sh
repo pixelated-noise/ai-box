@@ -26,7 +26,6 @@ apk update
 apk add bash sudo shadow
 useradd -m -d {{home}} -s /bin/bash {{username}}
 chown -R {{username}}:{{username}} {{home}}
-echo '{{username}}:aibox' | chpasswd
 echo '{{username}} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{username}}
 
 # SSH
@@ -38,6 +37,7 @@ cat > {{home}}/.ssh/authorized_keys << 'SSHEOF'
 SSHEOF
 chmod 600 {{home}}/.ssh/authorized_keys
 chown -R {{username}}:{{username}} {{home}}/.ssh
+sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 rc-update add sshd default
 /etc/init.d/sshd start || true
 
