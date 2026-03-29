@@ -29,5 +29,5 @@
    :task (ai/open-network)}
 
   clean
-  {:doc  "Remove all downloaded and generated files"
-   :task (ai/clean)}}}
+  {:doc  "Remove generated files (keeps ISO and OAuth token, use --logout to also remove token)"
+   :task (ai/clean {:logout (some #{"--logout"} *command-line-args*)})}}}

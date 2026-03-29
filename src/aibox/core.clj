@@ -91,6 +91,9 @@
                          "# Log to serial console\n"
                          "exec > /dev/hvc0 2>&1\n"
                          "echo '=== aibox provisioning started ==='\n\n"
+                         "# Hostname\n"
+                         "echo 'aibox' > /etc/hostname\n"
+                         "hostname aibox\n\n"
                          "# Load kernel modules and networking\n"
                          "rc-service modloop start\n"
                          "ip link set eth0 up\n"
@@ -287,9 +290,10 @@
   (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-F" "rules")
   (println "Network restrictions removed."))
 
-(defn clean []
-  (let [{:keys [data-dir iso-path]} config]
+(defn clean [{:keys [logout]}]
+  (let [{:keys [data-dir iso-path]} config
+        keep? #{iso-path (when-not logout token-path)}]
     (doseq [f (fs/list-dir data-dir)]
-      (when (not= (str f) iso-path)
+      (when-not (keep? (str f))
         (fs/delete-tree f)))
     (println "Done.")))
