@@ -104,61 +104,16 @@
         oauth-token (ensure-oauth-token)
         {:keys [username home]} template-vars
         alpine-repo (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
-        script      (str "#!/bin/sh\n"
-                         "set -e\n\n"
-                         "# Log to serial console\n"
-                         "exec > /dev/hvc0 2>&1\n"
-                         "echo '=== aibox provisioning started ==='\n\n"
-                         "# Hostname\n"
-                         "echo 'aibox' > /etc/hostname\n"
-                         "hostname aibox\n\n"
-                         "# Load kernel modules and networking\n"
-                         "rc-service modloop start\n"
-                         "ip link set eth0 up\n"
-                         "udhcpc -i eth0\n"
-                         "sleep 2\n\n"
-                         "# Enable online repositories\n"
-                         "cat > /etc/apk/repositories << 'REPOEOF'\n"
-                         "https://dl-cdn.alpinelinux.org/alpine/v" alpine-repo "/main\n"
-                         "https://dl-cdn.alpinelinux.org/alpine/v" alpine-repo "/community\n"
-                         "REPOEOF\n"
-                         "apk update\n\n"
-                         "# Create user\n"
-                         "apk add bash sudo shadow\n"
-                         "useradd -m -d " home " -s /bin/bash " username "\n"
-                         "chown -R " username ":" username " " home "\n"
-                         "echo '" username ":aibox' | chpasswd\n"
-                         "echo '" username " ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/" username "\n\n"
-                         "# SSH\n"
-                         "apk add openssh\n"
-                         "mkdir -p " home "/.ssh\n"
-                         "chmod 700 " home "/.ssh\n"
-                         "cat > " home "/.ssh/authorized_keys << 'SSHEOF'\n"
-                         pub-key "\n"
-                         "SSHEOF\n"
-                         "chmod 600 " home "/.ssh/authorized_keys\n"
-                         "chown -R " username ":" username " " home "/.ssh\n"
-                         "rc-update add sshd default\n"
-                         "/etc/init.d/sshd start || true\n\n"
-                         "# Mount shared directories from host\n"
-                         (->> (:mounts config)
-                              (map-indexed
-                               (fn [i m]
-                                 (str "mkdir -p " (:guest m) "\n"
-                                      "mount -t virtiofs"
-                                      (when (:readonly m) " -o ro")
-                                      " mount" i " " (:guest m) "\n")))
-                              (str/join))
-                         "# Add ~/.local/bin to PATH and Claude auth for all sessions\n"
-                         "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> /etc/profile\n"
-                         "echo 'export CLAUDE_CODE_OAUTH_TOKEN=\"" oauth-token "\"' >> /etc/profile\n"
-                         (when (some #(str/starts-with? (:guest %) home) (:mounts config))
-                           (str "echo 'cd " home "' >> /etc/profile\n"))
-                         (when (seq provision)
-                           (str "\n# User provisioning\n"
-                                "chmod 666 /dev/hvc0\n"
-                                (str/join "\n" provision) "\n"))
-                         "\necho '=== aibox provisioning complete ==='\n")]
+        script      (selmer/render
+                     (slurp "provision.sh")
+                     {:alpine-repo alpine-repo
+                      :username    username
+                      :home        home
+                      :pub-key     pub-key
+                      :oauth-token oauth-token
+                      :mounts      (map-indexed (fn [i m] (assoc m :index i)) (:mounts config))
+                      :provision   provision
+                      :cd-home     (some #(str/starts-with? (:guest %) home) (:mounts config))})]
 
     ;; Clean previous work
     (fs/delete-tree work-dir)
