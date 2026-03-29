@@ -20,6 +20,14 @@
   {:doc  "SSH into the running VM"
    :task (ai/ssh)}
 
+  block
+  {:doc  "Restrict VM network to Anthropic API only (requires sudo)"
+   :task (ai/restrict-network)}
+
+  allow
+  {:doc  "Remove VM network restrictions (requires sudo)"
+   :task (ai/open-network)}
+
   clean
   {:doc  "Remove all downloaded and generated files"
    :task (ai/clean)}}}

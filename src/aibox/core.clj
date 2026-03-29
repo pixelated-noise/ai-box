@@ -250,6 +250,43 @@
   (ensure-oauth-token)
   (println "Token stored at" token-path))
 
+(defn- find-bridge-interface []
+  (let [ip      (vm-ip)
+        gateway (when ip (str/replace ip #"\.\d+$" ".1"))
+        output  (when gateway
+                  (:out (p/shell {:out :string} "ifconfig")))]
+    (when output
+      (->> (str/split output #"(?m)^(?=\S)")
+           (keep (fn [block]
+                   (when (and (str/includes? block gateway)
+                              (re-find #"^bridge\d+" block))
+                     (re-find #"^bridge\d+" block))))
+           first))))
+
+(defn restrict-network []
+  (if-let [ip (vm-ip)]
+    (if-let [bridge (find-bridge-interface)]
+      (let [subnet (str/replace ip #"\.\d+$" ".0/24")
+            rules  (str "block quick on " bridge " inet6 all\n"
+                        "pass quick on " bridge " from " ip " to 160.79.104.0/23\n"
+                        "pass quick on " bridge " proto { tcp udp } from " ip " to any port 53\n"
+                        "pass quick on " bridge " from " ip " to " subnet "\n"
+                        "block quick on " bridge " from " ip " to any\n")]
+        (spit "/tmp/aibox-pf.rules" rules)
+        (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-f" "/tmp/aibox-pf.rules")
+        (p/shell {:continue true} "sudo" "pfctl" "-e")
+        (println "Network restricted to Anthropic API only on" bridge "for" ip))
+      (do
+        (println "Could not find bridge interface for VM.")
+        (System/exit 1)))
+    (do
+      (println "No VM found in DHCP leases. Is the VM running?")
+      (System/exit 1))))
+
+(defn open-network []
+  (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-F" "rules")
+  (println "Network restrictions removed."))
+
 (defn clean []
   (let [{:keys [data-dir iso-path]} config]
     (doseq [f (fs/list-dir data-dir)]
