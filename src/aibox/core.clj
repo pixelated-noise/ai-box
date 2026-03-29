@@ -4,6 +4,11 @@
             [clj-yaml.core :as yaml]
             [clojure.string :as str]))
 
+(defn- expand-home [path]
+  (if (str/starts-with? path "~")
+    (str/replace-first path "~" (System/getProperty "user.home"))
+    path))
+
 (def config
   (let [user-config    (yaml/parse-string (slurp "config.yaml"))
         alpine-version (:alpine-version user-config)
@@ -19,15 +24,14 @@
      :efi-vars-path  (str data-dir "/efi-vars")
      :headless       (:headless user-config false)
      :provision      (:provision user-config [])
-     :mounts         (:mounts user-config [])
+     :mounts         (mapv (fn [m]
+                            (let [host-abs (expand-home (:host m))]
+                              (merge m {:host-abs host-abs
+                                        :guest    (:guest m host-abs)})))
+                          (:mounts user-config []))
      :mac            (:mac vm "52:54:00:ab:cd:01")
      :cpus           (:cpus vm 4)
      :memory         (:memory vm 4096)}))
-
-(defn- expand-home [path]
-  (if (str/starts-with? path "~")
-    (str/replace-first path "~" (System/getProperty "user.home"))
-    path))
 
 (defn download []
   (let [{:keys [data-dir iso-path iso-url]} config]
@@ -133,6 +137,9 @@
                          "# Add ~/.local/bin to PATH and Claude auth for all sessions\n"
                          "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> /etc/profile\n"
                          "echo 'export CLAUDE_CODE_OAUTH_TOKEN=\"" oauth-token "\"' >> /etc/profile\n"
+                         (let [home (System/getProperty "user.home")]
+                           (when (some #(str/starts-with? (:guest %) home) (:mounts config))
+                             (str "echo 'cd " home "' >> /etc/profile\n")))
                          (when (seq provision)
                            (str "\n# User provisioning\n"
                                 (str/join "\n" provision) "\n"))
@@ -191,7 +198,7 @@
         mount-args   (->> (:mounts config)
                           (map-indexed
                            (fn [i m]
-                             ["--device" (str "virtio-fs,sharedDir=" (expand-home (:host m))
+                             ["--device" (str "virtio-fs,sharedDir=" (:host-abs m)
                                               ",mountTag=mount" i)]))
                           (apply concat)
                           vec)

@@ -92,9 +92,7 @@ mounts:
   - host: ~/.claude
     guest: /root/.claude
     readonly: true
-  - host: ~/projects
-    guest: /root/projects
-    readonly: false
+  - host: ~/projects/my-app
 
 provision:
   - apk update
@@ -110,8 +108,10 @@ provision:
 - **`vm`** -- CPU count, memory (MiB), and MAC address for deterministic IP assignment
 - **`mounts`** -- host directories to share with the VM via virtio-fs:
   - `host` -- path on the host (`~` is expanded to home directory)
-  - `guest` -- mount point inside the VM
+  - `guest` -- mount point inside the VM. If omitted, defaults to the absolute path of `host` (e.g. `~/projects/my-app` mounts at `/Users/you/projects/my-app`). This is recommended for project directories because Claude Code indexes conversations by the absolute working directory -- using the same path in the VM means `claude --resume` can find sessions started on the host, and vice versa.
   - `readonly` -- set to `true` to mount read-only (default: `false`)
+
+  When any mount's guest path falls under the host's home directory, the VM's default shell directory is set to the host home path. This means `bb ssh` lands you in `/Users/you` rather than `/root`, matching host paths naturally.
 
 ## Risks
 
