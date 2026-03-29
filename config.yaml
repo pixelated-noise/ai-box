@@ -8,11 +8,12 @@ vm:
 
 mounts:
   - host: ~/.claude
-    guest: /root/.claude
-    readonly: true
+  - host: ~/.cache/aibox/apk
+    guest: /etc/apk/cache
 
 provision:
   - apk update
   - apk add curl bash screen
   - apk add libgcc libstdc++ ripgrep
-  - curl -fsSL https://claude.ai/install.sh | bash
+  - apk add openjdk21 rlwrap
+  - su - sideris -c "curl -fsSL https://claude.ai/install.sh | bash"

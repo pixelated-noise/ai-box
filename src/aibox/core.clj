@@ -90,6 +90,9 @@
         key-path    (generate-ssh-key)
         pub-key     (str/trim (slurp (str key-path ".pub")))
         oauth-token (ensure-oauth-token)
+        username    (System/getProperty "user.name")
+        home        (System/getProperty "user.home")
+        alpine-repo (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
         script      (str "#!/bin/sh\n"
                          "set -e\n\n"
                          "# Log to serial console\n"
@@ -105,26 +108,27 @@
                          "sleep 2\n\n"
                          "# Enable online repositories\n"
                          "cat > /etc/apk/repositories << 'REPOEOF'\n"
-                         "https://dl-cdn.alpinelinux.org/alpine/v"
-                         (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
-                         "/main\n"
-                         "https://dl-cdn.alpinelinux.org/alpine/v"
-                         (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
-                         "/community\n"
+                         "https://dl-cdn.alpinelinux.org/alpine/v" alpine-repo "/main\n"
+                         "https://dl-cdn.alpinelinux.org/alpine/v" alpine-repo "/community\n"
                          "REPOEOF\n"
                          "apk update\n\n"
+                         "# Create user\n"
+                         "apk add sudo shadow\n"
+                         "useradd -m -d " home " -s /bin/sh " username "\n"
+                         "chown -R " username ":" username " " home "\n"
+                         "echo '" username ":aibox' | chpasswd\n"
+                         "echo '" username " ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/" username "\n\n"
                          "# SSH\n"
-                         "echo 'root:aibox' | chpasswd\n"
                          "apk add openssh\n"
-                         "mkdir -p /root/.ssh\n"
-                         "chmod 700 /root/.ssh\n"
-                         "cat > /root/.ssh/authorized_keys << 'SSHEOF'\n"
+                         "mkdir -p " home "/.ssh\n"
+                         "chmod 700 " home "/.ssh\n"
+                         "cat > " home "/.ssh/authorized_keys << 'SSHEOF'\n"
                          pub-key "\n"
                          "SSHEOF\n"
-                         "chmod 600 /root/.ssh/authorized_keys\n"
-                         "sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config\n"
+                         "chmod 600 " home "/.ssh/authorized_keys\n"
+                         "chown -R " username ":" username " " home "/.ssh\n"
                          "rc-update add sshd default\n"
-                         "/etc/init.d/sshd start\n\n"
+                         "/etc/init.d/sshd start || true\n\n"
                          "# Mount shared directories from host\n"
                          (->> (:mounts config)
                               (map-indexed
@@ -137,11 +141,11 @@
                          "# Add ~/.local/bin to PATH and Claude auth for all sessions\n"
                          "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> /etc/profile\n"
                          "echo 'export CLAUDE_CODE_OAUTH_TOKEN=\"" oauth-token "\"' >> /etc/profile\n"
-                         (let [home (System/getProperty "user.home")]
-                           (when (some #(str/starts-with? (:guest %) home) (:mounts config))
-                             (str "echo 'cd " home "' >> /etc/profile\n")))
+                         (when (some #(str/starts-with? (:guest %) home) (:mounts config))
+                           (str "echo 'cd " home "' >> /etc/profile\n"))
                          (when (seq provision)
                            (str "\n# User provisioning\n"
+                                "chmod 666 /dev/hvc0\n"
                                 (str/join "\n" provision) "\n"))
                          "\necho '=== aibox provisioning complete ==='\n")]
 
@@ -159,11 +163,15 @@
     (spit (str apkovl-root "/etc/local.d/provision.start") script)
     (p/shell "chmod" "+x" (str apkovl-root "/etc/local.d/provision.start"))
 
+    ;; Include motd
+    (when (fs/exists? "motd.txt")
+      (fs/copy "motd.txt" (str apkovl-root "/etc/motd")))
+
     ;; Include .claude.json in overlay
-    (let [claude-json (str (System/getProperty "user.home") "/.claude.json")]
+    (let [claude-json (str home "/.claude.json")]
       (when (fs/exists? claude-json)
-        (fs/create-dirs (str apkovl-root "/root"))
-        (fs/copy claude-json (str apkovl-root "/root/.claude.json"))))
+        (fs/create-dirs (str apkovl-root home))
+        (fs/copy claude-json (str apkovl-root home "/.claude.json"))))
 
     ;; Create apkovl tar.gz
     (fs/create-dirs tar-dir)
@@ -249,7 +257,7 @@
                    "-i" ssh-key-path
                    "-o" "StrictHostKeyChecking=no"
                    "-o" "UserKnownHostsFile=/dev/null"
-                   (str "root@" ip)]]
+                   (str (System/getProperty "user.name") "@" ip)]]
           (println (str/join " " cmd))
           (apply p/shell cmd)))
       (do
@@ -278,6 +286,7 @@
     (if-let [bridge (find-bridge-interface)]
       (let [subnet (str/replace ip #"\.\d+$" ".0/24")
             rules  (str "block quick on " bridge " inet6 all\n"
+                        "pass quick on " bridge " from any to " ip "\n"
                         "pass quick on " bridge " from " ip " to 160.79.104.0/23\n"
                         "pass quick on " bridge " proto { tcp udp } from " ip " to any port 53\n"
                         "pass quick on " bridge " from " ip " to " subnet "\n"
