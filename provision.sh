@@ -24,20 +24,23 @@ apk update
 
 # Create user
 apk add bash sudo shadow
-useradd -m -d {{home}} -s /bin/bash {{username}}
+useradd -m -d {{home}} -s /bin/bash {{username}} || true
+echo '{{username}}:*' | chpasswd -e
+chown root:root / /etc
+chown root:root $(dirname {{home}})
 chown -R {{username}}:{{username}} {{home}}
 echo '{{username}} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{username}}
 
 # SSH
 apk add openssh
-mkdir -p {{home}}/.ssh
-chmod 700 {{home}}/.ssh
-cat > {{home}}/.ssh/authorized_keys << 'SSHEOF'
+mkdir -p /etc/ssh/authorized_keys
+cat > /etc/ssh/authorized_keys/{{username}} << 'SSHEOF'
 {{pub-key}}
 SSHEOF
-chmod 600 {{home}}/.ssh/authorized_keys
-chown -R {{username}}:{{username}} {{home}}/.ssh
+cp /etc/ssh/authorized_keys/{{username}} /etc/ssh/authorized_keys/root
+chmod 644 /etc/ssh/authorized_keys/*
 sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's|^AuthorizedKeysFile.*|AuthorizedKeysFile /etc/ssh/authorized_keys/%u|' /etc/ssh/sshd_config
 rc-update add sshd default
 /etc/init.d/sshd start || true
 
