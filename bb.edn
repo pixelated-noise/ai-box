@@ -20,13 +20,13 @@
   {:doc  "SSH into the running VM"
    :task (ai/ssh)}
 
-  block
-  {:doc  "Restrict VM network to Anthropic API only (requires sudo)"
-   :task (ai/restrict-network)}
-
-  allow
-  {:doc  "Remove VM network restrictions (requires sudo)"
-   :task (ai/open-network)}
+  net
+  {:doc  "Network control: bb net [block|allow|status]"
+   :task (case (first *command-line-args*)
+           "block"  (ai/restrict-network)
+           "allow"  (ai/open-network)
+           "status" (ai/network-status)
+           (println "Usage: bb net [block|allow|status]"))}
 
   clean
   {:doc  "Remove generated files (keeps ISO and OAuth token, use --logout to also remove token)"

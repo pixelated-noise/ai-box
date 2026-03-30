@@ -30,16 +30,16 @@ bb boot
 bb ssh
 
 # Lock down network to Anthropic API only (recommended for YOLO mode)
-bb block
+bb net block
 
 # Run Claude Code inside the VM
 claude --dangerously-skip-permissions
 
 # When done, restore full network access
-bb allow
+bb net allow
 ```
 
-Wait for `=== aibox provisioning complete ===` in the boot terminal before running `bb ssh`. Run `bb block` after provisioning completes (provisioning needs unrestricted internet to install packages).
+Wait for `=== aibox provisioning complete ===` in the boot terminal before running `bb ssh`. Run `bb net block` after provisioning completes (provisioning needs unrestricted internet to install packages).
 
 ### All tasks
 
@@ -47,8 +47,10 @@ Wait for `=== aibox provisioning complete ===` in the boot terminal before runni
 |------|-------------|
 | `bb boot` | Download ISO (if needed), authenticate (if needed), build overlay, boot VM |
 | `bb ssh` | SSH into the running VM |
-| `bb block` | Restrict VM network to Anthropic API only (requires sudo) |
-| `bb allow` | Remove VM network restrictions (requires sudo) |
+| `bb net block` | Restrict VM network to Anthropic API only (requires sudo) |
+| `bb net allow` | Remove VM network restrictions (requires sudo) |
+| `bb net status` | Show current network restriction status (requires sudo) |
+| `bb net-status` | Show current network restriction status (requires sudo) |
 | `bb login` | Generate/refresh the OAuth token without booting |
 | `bb download` | Download the Alpine ISO only |
 | `bb clean` | Remove generated files (keeps the ISO and OAuth token) |
@@ -56,7 +58,7 @@ Wait for `=== aibox provisioning complete ===` in the boot terminal before runni
 
 ## Network restriction
 
-`bb block` uses macOS's `pf` (packet filter) to restrict the VM's outbound traffic to only:
+`bb net block` uses macOS's `pf` (packet filter) to restrict the VM's outbound traffic to only:
 
 - **Anthropic API** (160.79.104.0/23)
 - **DNS** (port 53, for resolving api.anthropic.com)
@@ -66,7 +68,7 @@ All IPv6 traffic is blocked to prevent bypass via dual-stack sites. The rules ar
 
 This restriction is enforced on the host, so even if Claude Code runs with full permissions inside the VM, it cannot remove or modify the firewall rules.
 
-`bb allow` removes all restrictions, restoring full internet access.
+`bb net allow` removes all restrictions, restoring full internet access.
 
 ## Authentication
 
@@ -118,7 +120,7 @@ provision:
 
 - **No persistence** -- the VM is ephemeral. Any work done inside it is lost when vfkit stops, unless it's on a read-write mount. Clone repos into a mounted directory and push results before shutting down.
 - **Read-write mounts** -- directories mounted with `readonly: false` can be modified by processes in the VM. Use read-only mounts for anything you don't want changed.
-- **Network access** -- the VM has full outbound internet access by default. Use `bb block` to restrict it to Anthropic API only before running Claude Code in autonomous mode.
+- **Network access** -- the VM has full outbound internet access by default. Use `bb net block` to restrict it to Anthropic API only before running Claude Code in autonomous mode.
 - **OAuth token** -- the long-lived OAuth token is stored in `data/oauth-token` and injected into the VM. Keep this file secure. `bb clean` preserves it; use `bb clean --logout` to remove it.
 - **Not a security boundary** -- vfkit uses Apple's Virtualization.framework, which provides reasonable isolation but is not designed as a security sandbox. Don't rely on this for running untrusted adversarial code.
 - **Provisioning runs every boot** -- since nothing persists, packages are re-downloaded each time. Boot-to-ready takes a minute or two depending on your connection.
@@ -150,7 +152,7 @@ bb boot
         |-- virtio-fs shares for each configured mount
         `-- virtio-gpu + input devices (unless headless)
 
-bb block
+bb net block
   |-- Detects VM bridge interface (e.g. bridge100)
   `-- Loads pf rules into com.apple/aibox anchor:
         |-- Block all IPv6

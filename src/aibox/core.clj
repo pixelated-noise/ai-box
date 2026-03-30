@@ -291,6 +291,15 @@
   (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-F" "rules")
   (println "=== Network restrictions removed. ==="))
 
+(defn network-status []
+  (let [rules (:out (p/shell {:out :string :continue true}
+                              "sudo" "pfctl" "-a" "com.apple/aibox" "-s" "rules"))]
+    (if (str/blank? rules)
+      (println "=== Network: OPEN (no restrictions) ===")
+      (do
+        (println "=== Network: BLOCKED (Anthropic API only) ===")
+        (println rules)))))
+
 (defn clean [{:keys [logout]}]
   (let [{:keys [data-dir iso-path]} config
         keep? #{iso-path (when-not logout token-path)}]
