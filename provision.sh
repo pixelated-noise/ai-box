@@ -33,6 +33,10 @@ chown root:root / /etc
 chown root:root $(dirname {{home}})
 chown -R {{username}}:{{username}} {{home}}
 echo '{{username}} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/{{username}}
+{% if git-name %}
+sudo -u {{username}} git config --global user.name "{{git-name}}"
+sudo -u {{username}} git config --global user.email "{{git-email}}"
+{% endif %}
 
 # SSH
 apk add openssh

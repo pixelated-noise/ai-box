@@ -12,8 +12,10 @@
     path))
 
 (def template-vars
-  {:username (System/getProperty "user.name")
-   :home     (System/getProperty "user.home")})
+  {:username  (System/getProperty "user.name")
+   :home      (System/getProperty "user.home")
+   :git-name  (str/trim (:out (p/shell {:out :string :continue true} "git" "config" "--global" "user.name")))
+   :git-email (str/trim (:out (p/shell {:out :string :continue true} "git" "config" "--global" "user.email")))})
 
 (def config
   (let [base           (yaml/parse-string (slurp "base-config.yaml"))
