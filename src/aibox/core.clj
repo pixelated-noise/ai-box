@@ -3,7 +3,8 @@
             [babashka.process :as p]
             [clj-yaml.core :as yaml]
             [clojure.string :as str]
-            [selmer.parser :as selmer]))
+            [selmer.parser :as selmer]
+            [selmer.util :as selmer-util]))
 
 (defn- expand-home [path]
   (if (str/starts-with? path "~")
@@ -105,7 +106,8 @@
         oauth-token (ensure-oauth-token)
         {:keys [username home]} template-vars
         alpine-repo (str/join "." (take 2 (str/split (:alpine-version config) #"\.")))
-        script      (selmer/render
+        script      (binding [selmer-util/*escape-variables* false]
+                     (selmer/render
                      (slurp "provision.sh")
                      {:alpine-repo alpine-repo
                       :username    username
@@ -114,7 +116,7 @@
                       :oauth-token oauth-token
                       :mounts      (map-indexed (fn [i m] (assoc m :index i)) (:mounts config))
                       :provision   provision
-                      :cd-home     (some #(str/starts-with? (:guest %) home) (:mounts config))})]
+                      :cd-home     (some #(str/starts-with? (:guest %) home) (:mounts config))}))]
 
     ;; Clean previous work
     (fs/delete-tree work-dir)
