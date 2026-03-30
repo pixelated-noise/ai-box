@@ -14,6 +14,8 @@ rc-service modloop start
 ip link set eth0 up
 udhcpc -i eth0
 sleep 2
+AIBOX_IP=$(ip -4 addr show eth0 | grep -o 'inet [0-9.]*' | awk '{print $2}')
+echo "AIBOX_IP=$AIBOX_IP"
 
 # Enable online repositories
 cat > /etc/apk/repositories << 'REPOEOF'

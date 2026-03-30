@@ -196,7 +196,16 @@
                       "--gui"]
         args         (if headless base-args (into base-args gui-args))]
     (println "Booting Alpine Linux" (if headless "(headless)" "(GUI)") "...")
-    (apply p/shell args)))
+    (let [ip-file   (str (:data-dir config) "/vm-ip")
+          proc      (apply p/process {:out :pipe :err :inherit} args)
+          reader    (java.io.BufferedReader. (java.io.InputStreamReader. (:out proc)))]
+      (loop []
+        (when-let [line (.readLine reader)]
+          (println line)
+          (when-let [[_ ip] (re-matches #"AIBOX_IP=(.*)" line)]
+            (spit ip-file ip))
+          (recur)))
+      @proc)))
 
 (defn- parse-dhcp-leases []
   (let [content (slurp "/var/db/dhcpd_leases")]
@@ -210,14 +219,17 @@
          (filter :ip_address))))
 
 (defn- vm-ip []
-  (let [mac        (:mac config)
-        hw-mac     (str "1," mac)
-        leases     (parse-dhcp-leases)
-        by-mac     (->> leases (filter #(= hw-mac (:hw_address %))) first)
-        by-recency (->> leases
-                        (sort-by #(Long/parseLong (subs (:lease % "0x0") 2) 16))
-                        last)]
-    (:ip_address (or by-mac by-recency))))
+  (let [ip-file (str (:data-dir config) "/vm-ip")]
+    (if (fs/exists? ip-file)
+      (str/trim (slurp ip-file))
+      (let [mac        (:mac config)
+            hw-mac     (str "1," mac)
+            leases     (parse-dhcp-leases)
+            by-mac     (->> leases (filter #(= hw-mac (:hw_address %))) first)
+            by-recency (->> leases
+                            (sort-by #(Long/parseLong (subs (:lease % "0x0") 2) 16))
+                            last)]
+        (:ip_address (or by-mac by-recency))))))
 
 (defn ssh []
   (let [{:keys [ssh-key-path]} config]
