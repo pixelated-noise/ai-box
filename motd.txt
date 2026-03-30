@@ -1,22 +1,14 @@
 
-                         bbbbbbbb
-                    iiii b::::::b
-                   i::::ib::::::b
-                    iiii b::::::b
-                          b:::::b
-  aaaaaaaaaaaaa   iiiiiii b:::::bbbbbbbbb       ooooooooooo xxxxxxx      xxxxxxx
-  a::::::::::::a  i:::::i b::::::::::::::bb   oo:::::::::::oox:::::x    x:::::x
-  aaaaaaaaa:::::a  i::::i b::::::::::::::::b o:::::::::::::::ox:::::x  x:::::x
-           a::::a  i::::i b:::::bbbbb:::::::bo:::::ooooo:::::o x:::::xx:::::x
-    aaaaaaa:::::a  i::::i b:::::b    b::::::bo::::o     o::::o  x::::::::::x
-  aa::::::::::::a  i::::i b:::::b     b:::::bo::::o     o::::o   x::::::::x
- a::::aaaa::::::a  i::::i b:::::b     b:::::bo::::o     o::::o   x::::::::x
-a::::a    a:::::a  i::::i b:::::b     b:::::bo::::o     o::::o  x::::::::::x
-a::::a    a:::::a i::::::ib:::::bbbbbb::::::bo:::::ooooo:::::o x:::::xx:::::x
-a:::::aaaa::::::a i::::::ib::::::::::::::::b o:::::::::::::::ox:::::x  x:::::x
- a::::::::::aa:::ai::::::ib:::::::::::::::b   oo:::::::::::oox:::::x    x:::::x
-  aaaaaaaaaa  aaaaiiiiiiiibbbbbbbbbbbbbbbb      ooooooooooo xxxxxxx      xxxxxxx
+      __        __     _______     ______  ___  ___
+     /""\      |" \   |   _  "\   /    " \|"  \/"  |
+    /    \     ||  |  (. |_)  :) // ____  \\   \  /
+   /' /\  \    |:  |  |:     \/ /  /    ) :)\\  \/
+  //  __'  \   |.  |  (|  _  \\(: (____/ // /\.  \
+ /   /  \\  \  /\  |\ |: |_)  :)\        / /  \   \
+(___/    \___)(__\_|_)(_______/  \"_____/ |___/\___|
 
 
-                     Sandboxed Claude Code environment
-          Type 'claude --dangerously-skip-permissions' to start
+Sandboxed Claude Code environment
+
+Type 'claude --dangerously-skip-permissions' to start
+
