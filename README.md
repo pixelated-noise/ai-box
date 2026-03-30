@@ -2,6 +2,9 @@
 
 A sandboxed environment for running [Claude Code](https://docs.anthropic.com/en/docs/claude-code) in fully autonomous ("YOLO") mode. It boots an ephemeral Alpine Linux VM on macOS using [vfkit](https://github.com/crc-org/vfkit), provisions it automatically, and provides SSH access -- giving Claude Code a disposable Linux environment where it can run any command without risk to your host system.
 
+> [!WARNING]
+> This is an early alpha release that has not undergone comprehensive security audits. While we have taken care to implement robust security measures, there may still be undiscovered issues. We do not recommend using this in production until we release a stable version of 1.0.
+
 ## Why
 
 Claude Code's autonomous mode is powerful but risky on a host machine -- it can modify files, install packages, and run arbitrary commands without confirmation. ai-box solves this by giving it an isolated VM that:
