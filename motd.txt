@@ -1,10 +1,22 @@
 
-       _ _
-  __ _(_) |__   _____  __
- / _` | | '_ \ / _ \ \/ /
-| (_| | | |_) | (_) >  <
- \__,_|_|_.__/ \___/_/\_\
+                         bbbbbbbb
+                    iiii b::::::b
+                   i::::ib::::::b
+                    iiii b::::::b
+                          b:::::b
+  aaaaaaaaaaaaa   iiiiiii b:::::bbbbbbbbb       ooooooooooo xxxxxxx      xxxxxxx
+  a::::::::::::a  i:::::i b::::::::::::::bb   oo:::::::::::oox:::::x    x:::::x
+  aaaaaaaaa:::::a  i::::i b::::::::::::::::b o:::::::::::::::ox:::::x  x:::::x
+           a::::a  i::::i b:::::bbbbb:::::::bo:::::ooooo:::::o x:::::xx:::::x
+    aaaaaaa:::::a  i::::i b:::::b    b::::::bo::::o     o::::o  x::::::::::x
+  aa::::::::::::a  i::::i b:::::b     b:::::bo::::o     o::::o   x::::::::x
+ a::::aaaa::::::a  i::::i b:::::b     b:::::bo::::o     o::::o   x::::::::x
+a::::a    a:::::a  i::::i b:::::b     b:::::bo::::o     o::::o  x::::::::::x
+a::::a    a:::::a i::::::ib:::::bbbbbb::::::bo:::::ooooo:::::o x:::::xx:::::x
+a:::::aaaa::::::a i::::::ib::::::::::::::::b o:::::::::::::::ox:::::x  x:::::x
+ a::::::::::aa:::ai::::::ib:::::::::::::::b   oo:::::::::::oox:::::x    x:::::x
+  aaaaaaaaaa  aaaaiiiiiiiibbbbbbbbbbbbbbbb      ooooooooooo xxxxxxx      xxxxxxx
 
- Sandboxed Claude Code environment
- Type 'claude --dangerously-skip-permissions' to start
 
+                     Sandboxed Claude Code environment
+          Type 'claude --dangerously-skip-permissions' to start
