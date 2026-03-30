@@ -269,15 +269,17 @@
 (defn restrict-network []
   (if-let [ip (vm-ip)]
     (if-let [bridge (find-bridge-interface)]
-      (let [subnet (str/replace ip #"\.\d+$" ".0/24")
-            rules  (str "block return out quick on " bridge " inet6 all\n"
-                        "pass quick on " bridge " from any to " ip "\n"
-                        "pass quick on " bridge " from " ip " to 160.79.104.0/23\n"
-                        "pass quick on " bridge " proto { tcp udp } from " ip " to any port 53\n"
-                        "pass quick on " bridge " from " ip " to " subnet "\n"
-                        "block quick on " bridge " from " ip " to any\n")]
-        (spit "/tmp/aibox-pf.rules" rules)
-        (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-f" "/tmp/aibox-pf.rules")
+      (let [gateway   (str/replace ip #"\.\d+$" ".1")
+            rules-file (str (:data-dir config) "/pf.rules")
+            rules     (str "block return out quick on " bridge " inet6 all\n"
+                           "pass quick on " bridge " from any to " ip "\n"
+                           "pass quick on " bridge " proto tcp from " ip " to 160.79.104.0/23 port 443\n"
+                           "pass quick on " bridge " proto { tcp udp } from " ip " to " gateway " port 53\n"
+                           "pass quick on " bridge " proto tcp from " ip " to " gateway " port 22\n"
+                           "block return quick on " bridge " from " ip " to any\n")]
+        (spit rules-file rules)
+        (fs/set-posix-file-permissions rules-file "rw-------")
+        (p/shell "sudo" "pfctl" "-a" "com.apple/aibox" "-f" rules-file)
         (p/shell {:continue true} "sudo" "pfctl" "-e")
         (println "=== Network restricted to Anthropic API only on" bridge "for" ip " ==="))
       (do
