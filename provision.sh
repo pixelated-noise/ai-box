@@ -11,6 +11,7 @@ hostname aibox
 
 # Load kernel modules and networking
 rc-service modloop start
+ip link set lo up
 ip link set eth0 up
 udhcpc -i eth0
 sleep 2

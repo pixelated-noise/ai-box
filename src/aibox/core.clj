@@ -268,7 +268,7 @@
   (if-let [ip (vm-ip)]
     (if-let [bridge (find-bridge-interface)]
       (let [subnet (str/replace ip #"\.\d+$" ".0/24")
-            rules  (str "block quick on " bridge " inet6 all\n"
+            rules  (str "block return out quick on " bridge " inet6 all\n"
                         "pass quick on " bridge " from any to " ip "\n"
                         "pass quick on " bridge " from " ip " to 160.79.104.0/23\n"
                         "pass quick on " bridge " proto { tcp udp } from " ip " to any port 53\n"
