@@ -105,7 +105,7 @@ provision:
 ### Options
 
 - **`headless`** -- set to `true` to skip the GUI window (serial console only)
-- **`provision`** -- shell commands that run as root after networking and SSH are configured. Use `su - {{username}} -c "..."` to run commands as the VM user (e.g. for installing tools to the user's home directory). Selmer template variables `{{username}}` and `{{home}}` are available.
+- **`provision`** -- shell commands that run as root after networking and SSH are configured. Use `sudo -u {{username}} -i sh -c "..."` to run commands as the VM user (e.g. for installing tools to the user's home directory). Selmer template variables `{{username}}` and `{{home}}` are available.
 - **`vm`** -- CPU count, memory (MiB), and MAC address for deterministic IP assignment
 - **`mounts`** -- host directories to share with the VM via virtio-fs:
   - `host` -- path on the host (`~` is expanded to home directory)
@@ -131,21 +131,22 @@ bb boot
   |-- Downloads Alpine Linux aarch64 ISO (cached in data/)
   |-- Generates SSH key pair (cached in data/)
   |-- Obtains OAuth token via `claude setup-token` (cached in data/)
-  |-- Builds an Alpine overlay (apkovl):
+  |-- Builds an Alpine overlay (apkovl) from provision.sh template:
   |     |-- Starts modloop (kernel modules)
-  |     |-- Configures networking (DHCP)
+  |     |-- Configures networking (DHCP), captures VM IP
+  |     |-- Creates non-root user matching host username
   |     |-- Enables online APK repositories
-  |     |-- Installs openssh, injects SSH public key
+  |     |-- Configures SSH (key-only auth, password disabled)
   |     |-- Mounts shared directories from host (virtio-fs)
   |     |-- Sets CLAUDE_CODE_OAUTH_TOKEN for Claude auth
-  |     |-- Runs user provision commands from config.yaml
+  |     |-- Runs provision commands from base-config.yaml + config.yaml
   |     `-- Logs progress to serial console (/dev/hvc0)
   |-- Packages overlay as FAT disk image (via hdiutil)
-  `-- Launches vfkit with:
+  `-- Launches vfkit, captures AIBOX_IP from serial output to data/vm-ip:
         |-- Alpine ISO as USB mass storage (boot device)
         |-- Overlay image as USB mass storage (auto-applied by Alpine init)
-        |-- virtio-net with fixed MAC (for IP lookup via DHCP leases)
-        |-- virtio-serial on stdio (provisioning log output)
+        |-- virtio-net with fixed MAC
+        |-- virtio-serial on stdio (provisioning log + IP capture)
         |-- virtio-fs shares for each configured mount
         `-- virtio-gpu + input devices (unless headless)
 
@@ -153,14 +154,15 @@ bb block
   |-- Detects VM bridge interface (e.g. bridge100)
   `-- Loads pf rules into com.apple/aibox anchor:
         |-- Block all IPv6
+        |-- Allow inbound to VM (SSH)
         |-- Allow Anthropic API (160.79.104.0/23)
         |-- Allow DNS (port 53)
-        |-- Allow local subnet (SSH)
+        |-- Allow local subnet
         `-- Block everything else
 
 bb ssh
-  |-- Reads /var/db/dhcpd_leases, matches on configured MAC address
-  `-- Connects via SSH using the generated key pair
+  |-- Reads VM IP from data/vm-ip (falls back to DHCP leases)
+  `-- Connects as host user via SSH key
 ```
 
 ### Key technologies

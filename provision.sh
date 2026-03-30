@@ -53,7 +53,7 @@ mount -t virtiofs{% if mount.readonly %} -o ro{% endif %} mount{{mount.index}} {
 {% endfor %}
 
 # Add ~/.local/bin to PATH and Claude auth for all sessions
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> /etc/profile
+echo 'export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"' >> /etc/profile
 echo 'export CLAUDE_CODE_OAUTH_TOKEN="{{oauth-token}}"' >> /etc/profile
 {% if cd-home %}
 echo 'cd {{home}}' >> /etc/profile
