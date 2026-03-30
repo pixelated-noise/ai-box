@@ -105,7 +105,7 @@ provision:
 ### Options
 
 - **`headless`** -- set to `true` to skip the GUI window (serial console only)
-- **`provision`** -- shell commands that run after networking and SSH are configured
+- **`provision`** -- shell commands that run as root after networking and SSH are configured. Use `su - {{username}} -c "..."` to run commands as the VM user (e.g. for installing tools to the user's home directory). Selmer template variables `{{username}}` and `{{home}}` are available.
 - **`vm`** -- CPU count, memory (MiB), and MAC address for deterministic IP assignment
 - **`mounts`** -- host directories to share with the VM via virtio-fs:
   - `host` -- path on the host (`~` is expanded to home directory)
