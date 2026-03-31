@@ -272,7 +272,7 @@
       (let [gateway   (str/replace ip #"\.\d+$" ".1")
             rules-file (str (:data-dir config) "/pf.rules")
             rules     (str "block return out quick on " bridge " inet6 all\n"
-                           "pass quick on " bridge " from any to " ip "\n"
+                           "pass quick on " bridge " from " gateway " to " ip "\n"
                            "pass quick on " bridge " proto tcp from " ip " to 160.79.104.0/23 port 443\n"
                            "pass quick on " bridge " proto { tcp udp } from " ip " to " gateway " port 53\n"
                            "pass quick on " bridge " proto tcp from " ip " to " gateway " port 22\n"
