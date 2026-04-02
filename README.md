@@ -53,7 +53,6 @@ Wait for `=== aibox provisioning complete ===` in the boot terminal before runni
 | `bb net block` | Restrict VM network to Anthropic API only (requires sudo) |
 | `bb net allow` | Remove VM network restrictions (requires sudo) |
 | `bb net status` | Show current network restriction status (requires sudo) |
-| `bb net-status` | Show current network restriction status (requires sudo) |
 | `bb login` | Generate/refresh the OAuth token without booting |
 | `bb download` | Download the Alpine ISO only |
 | `bb clean` | Remove generated files (keeps the ISO and OAuth token) |
