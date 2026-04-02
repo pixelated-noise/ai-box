@@ -1,0 +1,18 @@
+vm:
+  cpus: 8
+  memory: 8192
+
+mounts:
+  - host: ~/devel/my-project
+
+provision:
+  - apk add openjdk21 rlwrap python3 py3-pip
+  - curl -fsSL https://download.clojure.org/install/linux-install.sh | bash
+  - curl -fsSL https://raw.githubusercontent.com/babashka/babashka/master/install | bash
+  - sudo -u {{username}} -i sh -c "mkdir -p ~/.local/bin && curl -fsSL https://raw.githubusercontent.com/babashka/bbin/v0.2.4/bbin -o ~/.local/bin/bbin && chmod +x ~/.local/bin/bbin"
+  - sudo -u {{username}} -i sh -c "~/.local/bin/bbin install https://github.com/bhauman/clojure-mcp-light.git --tag v0.2.1"
+  - sudo -u {{username}} -i sh -c "~/.local/bin/bbin install https://github.com/bhauman/clojure-mcp-light.git --tag v0.2.1 --as clj-nrepl-eval --main-opts '[\"-m\" \"clojure-mcp-light.nrepl-eval\"]'"
+  - sudo -u {{username}} -i sh -c "~/.local/bin/bbin install https://github.com/bhauman/clojure-mcp-light.git --tag v0.2.1 --as clj-paren-repair --main-opts '[\"-m\" \"clojure-mcp-light.paren-repair\"]'"
+  - sudo -u {{username}} -i sh -c "clj-paren-repair --help || true"
+  - curl -fsSL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein -o /usr/local/bin/lein && chmod +x /usr/local/bin/lein
+  - sudo -u {{username}} -i sh -c "cd ~/devel/my-project && lein deps"

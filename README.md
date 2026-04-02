@@ -100,11 +100,13 @@ mounts:
   - host: ~/projects/my-app
 
 provision:
-  - apk update
-  - apk add curl bash
-  - apk add libgcc libstdc++ ripgrep
-  - curl -fsSL https://claude.ai/install.sh | bash
+  - apk add openjdk21 rlwrap python3 py3-pip
+  - curl -fsSL https://download.clojure.org/install/linux-install.sh | bash
+  - curl -fsSL https://raw.githubusercontent.com/babashka/babashka/master/install | bash
+  - sudo -u {{username}} -i sh -c "cd ~/devel/my-project && lein deps"
 ```
+
+Also see `example-config.yaml` file.
 
 ### Options
 
